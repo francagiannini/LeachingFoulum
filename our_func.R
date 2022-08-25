@@ -1,11 +1,17 @@
+
+# Packages used
 library(tidyverse)
 library(readxl)
 library(lubridate)
+
+# Read table and identification of observations 
 
 dfN <- read_excel("data/Flakke_DrainAPSIM_2016_17.xlsx") |> 
   unique() |> 
   mutate(idx=seq(1,n(),1))
 
+# Spliting table between interpolation periods
+# Te result is a list of data frames eac element will be one period 
 
 dfN_spl <- dfN |> 
   mutate(
@@ -31,6 +37,10 @@ for(i in 1:length(dfN_spl)){
   period_list[[i]] <- rbind(p, pfin) |>
     mutate(index = row_number()) |> unique()
 }
+
+
+# The interpolation function it runs for each period by row 
+# calculating a nwe concentration for each row 
 
 ci_func <- function(i, p = period_list, id) {
   #browser()
@@ -64,6 +74,8 @@ ci_func <- function(i, p = period_list, id) {
   
 }
 
+# Function to aply the period function to the list of periods
+
 ci_func_df <- function(period_list_df) {
   
   lapply(1:(nrow(period_list_df)), function(x, p) {
@@ -75,13 +87,18 @@ ci_func_df <- function(period_list_df) {
   
 }
 
+# Running the interpolation 
+
 interpol <- do.call(bind_rows, lapply(period_list, ci_func_df)) |> 
   distinct(idx,.keep_all = TRUE)
 
-dfN$nwecoc <- interpol$C_i
+# Writing the nwe concentration
+dfN$nweconc <- interpol$C_i
+
+# Ploting the results 
 
 ggplot(dfN, 
-       aes(x= date, y=nwecoc, color=as.factor(beh)))+
+       aes(x= date, y=nweconc, color=as.factor(beh)))+
   geom_line()+
   geom_point()+
   theme_bw()
