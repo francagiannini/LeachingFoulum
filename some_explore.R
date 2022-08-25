@@ -24,17 +24,16 @@ dfN |> group_by(beh) |>
 
 dfN |> group_by(beh) |> 
   mutate(cumdrain=cumsum(drain)) |>
-  pivot_longer(cols=c(conc,nwecoc), 
+  pivot_longer(cols=c(conc,nweconc), 
                names_to = "interpol", values_to = "Concentration") |> 
   # group_by(beh) |> 
   # filter(row_number(beh) > 5) |>
   ggplot(aes(y=Concentration,x=cumdrain , 
-             col=as.factor(interpol), fill=as.factor(interpol)
-  ))+
-  geom_point(#aes(col=as.factor(beh))
-             ) +
-  geom_smooth() +
-  #facet_wrap(~beh)+
+             col=as.factor(interpol)#, fill=as.factor(interpol
+             ))+
+  geom_point(aes(col=as.factor(beh)))+
+  geom_smooth(aes(col=as.factor(beh))) +
+  facet_wrap(~beh)+
   theme_bw()
 
 

@@ -1,21 +1,27 @@
+### I ----
 
 # Packages used
 library(tidyverse)
 library(readxl)
 library(lubridate)
 
-# Read table and identification of observations 
+# Reads the input table and identification of observations 
 
+## please introduce the input file location 
+## as the first argument in the following function 
 dfN <- read_excel("data/Flakke_DrainAPSIM_2016_17.xlsx") |> 
   unique() |> 
-  mutate(idx=seq(1,n(),1))
+  mutate(idx=seq(1,n(),1),
+         drain=if_else(drain<0,0,drain))
+
+
+### II ----
 
 # Spliting table between interpolation periods
 # Te result is a list of data frames eac element will be one period 
 
 dfN_spl <- dfN |> 
   mutate(
-    drain=if_else(drain<0,0,drain),
     period=
      cut(as.numeric(idx), dfN$idx[!is.na(dfN$conc)],
          labels=FALSE,
@@ -38,6 +44,7 @@ for(i in 1:length(dfN_spl)){
     mutate(index = row_number()) |> unique()
 }
 
+### III ----
 
 # The interpolation function it runs for each period by row 
 # calculating a nwe concentration for each row 
@@ -58,8 +65,12 @@ ci_func <- function(i, p = period_list, id) {
   
   D_i <- p[id, "drain"]
   
-  f_Di <- ((D_a / 2) + sum(p[2:(id - 1), "drain"]) + (D_i / 2)) /
-    ((D_a / 2) + sum(p[2:(B - 1), "drain"]) + (D_b / 2))
+  f_Di <- ((D_a / 2) + 
+             ifelse(id>2,sum(p[2:(id - 1), "drain"]),0)+ #p[1,"drain"]) +
+             (D_i / 2)) /
+    ((D_a / 2) + 
+       sum(p[2:(B - 1), "drain"]) + 
+       (D_b / 2))
   
   f_Di <- ifelse(is.na(f_Di),0,f_Di)
   
@@ -87,6 +98,8 @@ ci_func_df <- function(period_list_df) {
   
 }
 
+### IV ----
+
 # Running the interpolation 
 
 interpol <- do.call(bind_rows, lapply(period_list, ci_func_df)) |> 
@@ -95,23 +108,39 @@ interpol <- do.call(bind_rows, lapply(period_list, ci_func_df)) |>
 # Writing the nwe concentration
 dfN$nweconc <- interpol$C_i
 
-# Ploting the results 
+dfN |> mutate(
+  leach = drain*nweconc,
+  int_outflux = cumsum(drain*nweconc)
+  ) 
 
+# Save output
+## Introduce the desired output name and location in the following function
+
+write.csv(dfN, file= "Flakke_DrainAPSIM_2016_17_output.xlsx")
+
+
+### V ----
+
+# Ploting the results temporal trend
 ggplot(dfN, 
        aes(x= date, y=nweconc, color=as.factor(beh)))+
   geom_line()+
   geom_point()+
+  geom_point(aes(x=date,y=conc, size = 0.4))+
+  theme_bw()+
+  labs(y="N oncentration (mg/L)", x="Date", color= "beh")+
+  guides(size = FALSE)
+
+dfN |> group_by(beh) |> 
+  mutate(cumdrain=cumsum(drain),
+         observation=if_else(is.na(conc) ,"interpol", "observed")) |>
+  ggplot(aes(x= cumdrain, y=nweconc, color=as.factor(beh)))+
+  geom_line()+
+  geom_point()+
+  geom_point(aes(x=cumdrain,y=conc, size = 0.4))+
+  labs(y="N oncentration (mg/L)", 
+       x="Cummulative drainage (mm)",
+       color= "beh")+
+  guides(size = FALSE)+
   theme_bw()
 
-
-# long_df <- long_df |>  
-#   group_by(beh, interpolation_method) |>  
-#   arrange(date) |>
-#   mutate(integrated_outflux= cumsum(drain*interp_conc)) 
-# 
-# ggplot(filter(long_df, beh==73), 
-#        aes(x=date, y=interp_conc*drain, 
-#            color=interpolation_method))+
-#   facet_wrap(~beh)+
-#   geom_line()+
-#   geom_smooth()
